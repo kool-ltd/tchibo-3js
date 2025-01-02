@@ -19,14 +19,24 @@
             height: 100vh;
         }
     </style>
+    <!-- Add Three.js library -->
+    <script async src="https://unpkg.com/es-module-shims/dist/es-module-shims.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.159.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.159.0/examples/jsm/"
+        }
+    }
+    </script>
 </head>
 <body>
     <div id="scene-container"></div>
 
     <script type="module">
-        import * as THREE from 'https://unpkg.com/three@0.159.0/build/three.module.js';
-        import { OrbitControls } from 'https://unpkg.com/three@0.159.0/examples/jsm/controls/OrbitControls.js';
-        import { GLTFLoader } from 'https://unpkg.com/three@0.159.0/examples/jsm/loaders/GLTFLoader.js';
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
         let scene, camera, renderer, controls;
 
@@ -42,7 +52,7 @@
                 0.1,
                 1000
             );
-            camera.position.set(0, 0, 5); // Set initial camera position
+            camera.position.set(0, 0, 5);
 
             // Renderer setup
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -64,9 +74,20 @@
 
             // Load Model
             const loader = new GLTFLoader();
+            
+            // Add a loading manager to track progress
+            const loadingManager = new THREE.LoadingManager();
+            loadingManager.onProgress = function(url, itemsLoaded, itemsTotal) {
+                console.log('Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.');
+            };
+
+            loader.setManager(loadingManager);
+            
             loader.load(
-                '241218 - tchibo - 4 in 1 rolling pin.glb',
+                './241218 - tchibo - 4 in 1 rolling pin.glb', // Make sure this path is correct
                 function(gltf) {
+                    console.log('Model loaded:', gltf);
+                    
                     // Center the model
                     const box = new THREE.Box3().setFromObject(gltf.scene);
                     const center = box.getCenter(new THREE.Vector3());
@@ -76,20 +97,17 @@
 
                     scene.add(gltf.scene);
 
-                    // Optional: Adjust camera to fit model
+                    // Adjust camera to fit model
                     const size = box.getSize(new THREE.Vector3());
                     const maxDim = Math.max(size.x, size.y, size.z);
                     camera.position.z = maxDim * 2;
                     
-                    // Log success
-                    console.log('Model loaded successfully');
+                    console.log('Model added to scene');
                 },
                 function(xhr) {
-                    // Loading progress
                     console.log((xhr.loaded / xhr.total * 100) + '% loaded');
                 },
                 function(error) {
-                    // Error handling
                     console.error('An error occurred loading the model:', error);
                 }
             );
