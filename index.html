@@ -18,43 +18,17 @@
             width: 100vw;
             height: 100vh;
         }
-
-        .control-panel {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255, 255, 255, 0.8);
-            padding: 10px;
-            border-radius: 5px;
-        }
-
-        .part-button {
-            display: block;
-            margin: 5px;
-            padding: 5px 10px;
-            cursor: pointer;
-        }
     </style>
 </head>
 <body>
     <div id="scene-container"></div>
-    <div class="control-panel">
-        <button class="part-button" data-part="0">Part 1</button>
-        <button class="part-button" data-part="1">Part 2</button>
-        <button class="part-button" data-part="2">Part 3</button>
-        <button class="part-button" data-part="3">Part 4</button>
-    </div>
 
     <script type="module">
-        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.module.js';
-        import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.159.0/examples/jsm/controls/OrbitControls.js';
-        import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.159.0/examples/jsm/loaders/GLTFLoader.js';
-        import { DragControls } from 'https://cdn.jsdelivr.net/npm/three@0.159.0/examples/jsm/controls/DragControls.js';
+        import * as THREE from 'https://unpkg.com/three@0.159.0/build/three.module.js';
+        import { OrbitControls } from 'https://unpkg.com/three@0.159.0/examples/jsm/controls/OrbitControls.js';
+        import { GLTFLoader } from 'https://unpkg.com/three@0.159.0/examples/jsm/loaders/GLTFLoader.js';
 
         let scene, camera, renderer, controls;
-        let modelParts = [];
-        let selectedPart = null;
-        let dragControls;
 
         function init() {
             // Scene setup
@@ -68,22 +42,20 @@
                 0.1,
                 1000
             );
-            camera.position.z = 5;
+            camera.position.set(0, 0, 5); // Set initial camera position
 
             // Renderer setup
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.shadowMap.enabled = true;
             document.getElementById('scene-container').appendChild(renderer.domElement);
 
             // Lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1);
             scene.add(ambientLight);
 
             const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
             directionalLight.position.set(5, 5, 5);
-            directionalLight.castShadow = true;
             scene.add(directionalLight);
 
             // Controls
@@ -95,54 +67,32 @@
             loader.load(
                 '241218 - tchibo - 4 in 1 rolling pin.glb',
                 function(gltf) {
-                    gltf.scene.traverse((child) => {
-                        if (child.isMesh) {
-                            child.castShadow = true;
-                            child.receiveShadow = true;
-                            modelParts.push(child);
-                        }
-                    });
+                    // Center the model
+                    const box = new THREE.Box3().setFromObject(gltf.scene);
+                    const center = box.getCenter(new THREE.Vector3());
+                    gltf.scene.position.x += -center.x;
+                    gltf.scene.position.y += -center.y;
+                    gltf.scene.position.z += -center.z;
+
                     scene.add(gltf.scene);
 
-                    // Setup drag controls for parts
-                    dragControls = new DragControls(modelParts, camera, renderer.domElement);
+                    // Optional: Adjust camera to fit model
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    camera.position.z = maxDim * 2;
                     
-                    dragControls.addEventListener('dragstart', function() {
-                        controls.enabled = false;
-                    });
-
-                    dragControls.addEventListener('dragend', function() {
-                        controls.enabled = true;
-                    });
+                    // Log success
+                    console.log('Model loaded successfully');
                 },
                 function(xhr) {
+                    // Loading progress
                     console.log((xhr.loaded / xhr.total * 100) + '% loaded');
                 },
                 function(error) {
+                    // Error handling
                     console.error('An error occurred loading the model:', error);
                 }
             );
-
-            // Setup part selection
-            document.querySelectorAll('.part-button').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const partIndex = parseInt(e.target.dataset.part);
-                    selectedPart = modelParts[partIndex];
-                    
-                    // Reset all parts' materials
-                    modelParts.forEach(part => {
-                        if (part.material.originalColor === undefined) {
-                            part.material.originalColor = part.material.color.clone();
-                        }
-                        part.material.color.copy(part.material.originalColor);
-                    });
-
-                    // Highlight selected part
-                    if (selectedPart) {
-                        selectedPart.material.color.setHex(0xff0000);
-                    }
-                });
-            });
 
             window.addEventListener('resize', onWindowResize, false);
         }
