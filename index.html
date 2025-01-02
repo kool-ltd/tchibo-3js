@@ -19,7 +19,6 @@
             height: 100vh;
         }
     </style>
-    <!-- Add Three.js library -->
     <script async src="https://unpkg.com/es-module-shims/dist/es-module-shims.js"></script>
     <script type="importmap">
     {
@@ -60,6 +59,10 @@
             renderer.setPixelRatio(window.devicePixelRatio);
             document.getElementById('scene-container').appendChild(renderer.domElement);
 
+            // Add a grid helper
+            const gridHelper = new THREE.GridHelper(10, 10);
+            scene.add(gridHelper);
+
             // Lighting
             const ambientLight = new THREE.AmbientLight(0xffffff, 1);
             scene.add(ambientLight);
@@ -75,18 +78,11 @@
             // Load Model
             const loader = new GLTFLoader();
             
-            // Add a loading manager to track progress
-            const loadingManager = new THREE.LoadingManager();
-            loadingManager.onProgress = function(url, itemsLoaded, itemsTotal) {
-                console.log('Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.');
-            };
-
-            loader.setManager(loadingManager);
-            
+            console.log('Starting model load...');
             loader.load(
                 './241218 - tchibo - 4 in 1 rolling pin.glb', // Make sure this path is correct
                 function(gltf) {
-                    console.log('Model loaded:', gltf);
+                    console.log('Model loaded successfully');
                     
                     // Center the model
                     const box = new THREE.Box3().setFromObject(gltf.scene);
@@ -101,16 +97,20 @@
                     const size = box.getSize(new THREE.Vector3());
                     const maxDim = Math.max(size.x, size.y, size.z);
                     camera.position.z = maxDim * 2;
-                    
-                    console.log('Model added to scene');
                 },
+                // Progress callback
                 function(xhr) {
                     console.log((xhr.loaded / xhr.total * 100) + '% loaded');
                 },
+                // Error callback
                 function(error) {
                     console.error('An error occurred loading the model:', error);
                 }
             );
+
+            // Add axes helper to visualize orientation
+            const axesHelper = new THREE.AxesHelper(5);
+            scene.add(axesHelper);
 
             window.addEventListener('resize', onWindowResize, false);
         }
