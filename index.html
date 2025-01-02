@@ -66,36 +66,40 @@
     <button id="ar-button" style="display: none;">Enter AR</button>
     <div id="loading-text">Loading model...</div>
     <div id="instructions">
-        Touch and hold to move • Use two fingers to rotate
+        Tap and drag to move • Pinch to rotate
     </div>
 
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { ARButton } from 'three/addons/webxr/ARButton.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        let scene, camera, renderer, controller;
+        let scene, camera, renderer, controller, controls;
         let model;
         let reticle;
         let hitTestSource = null;
         let hitTestSourceRequested = false;
         let selectedObject = null;
         let initialTouchPosition = new THREE.Vector2();
-        let previousTouchPosition = new THREE.Vector2();
         let isMoving = false;
-        let isRotating = false;
+        let isInAR = false;
         let placedModels = [];
 
         async function init() {
             scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f0f0);
 
+            // Camera setup
             camera = new THREE.PerspectiveCamera(
                 75,
                 window.innerWidth / window.innerHeight,
                 0.1,
                 1000
             );
+            camera.position.set(0, 0.3, 0.5); // Adjusted for preview
 
+            // Renderer setup
             renderer = new THREE.WebGLRenderer({ 
                 antialias: true, 
                 alpha: true,
@@ -105,6 +109,11 @@
             renderer.xr.enabled = true;
             document.getElementById('scene-container').appendChild(renderer.domElement);
 
+            // Preview controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 0.1, 0);
+            controls.update();
+
             // Lighting
             const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
             scene.add(ambientLight);
@@ -112,6 +121,10 @@
             const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
             directionalLight.position.set(5, 5, 5);
             scene.add(directionalLight);
+
+            // Preview grid
+            const gridHelper = new THREE.GridHelper(2, 20);
+            scene.add(gridHelper);
 
             // Create reticle
             reticle = new THREE.Mesh(
@@ -127,7 +140,9 @@
                 './241218 - tchibo - 4 in 1 rolling pin.glb',
                 function(gltf) {
                     model = gltf.scene;
-                    const REAL_WORLD_LENGTH = 0.45; // 45cm length
+                    
+                    // Set real-world scale (rolling pin is approximately 45cm long)
+                    const REAL_WORLD_LENGTH = 0.045; // 45cm = 0.45m, divided by 10 for smaller scale
                     
                     const bbox = new THREE.Box3().setFromObject(model);
                     const modelSize = bbox.getSize(new THREE.Vector3());
@@ -135,9 +150,15 @@
                     
                     model.scale.set(scaleFactor, scaleFactor, scaleFactor);
                     
+                    // Center the model
                     bbox.setFromObject(model);
                     const center = bbox.getCenter(new THREE.Vector3());
                     model.position.sub(center);
+                    
+                    // Add preview model
+                    const previewModel = model.clone();
+                    previewModel.position.set(0, 0, 0);
+                    scene.add(previewModel);
                     
                     document.getElementById('loading-text').style.display = 'none';
                     console.log('Model loaded successfully');
@@ -159,9 +180,20 @@
                         const arButton = ARButton.createButton(renderer, {
                             requiredFeatures: ['hit-test'],
                             optionalFeatures: ['dom-overlay'],
-                            domOverlay: { root: document.body }
+                            domOverlay: { root: document.body },
+                            sessionInit: {
+                                optionalFeatures: ['dom-overlay'],
+                                domOverlay: { root: document.body }
+                            }
                         });
                         document.body.appendChild(arButton);
+
+                        arButton.addEventListener('click', () => {
+                            isInAR = true;
+                            controls.enabled = false;
+                            scene.background = null;
+                            gridHelper.visible = false;
+                        });
                     }
                 });
             }
@@ -170,21 +202,18 @@
             controller.addEventListener('select', onSelect);
             scene.add(controller);
 
-            // Touch event listeners
-            renderer.domElement.addEventListener('touchstart', onTouchStart, false);
-            renderer.domElement.addEventListener('touchmove', onTouchMove, false);
-            renderer.domElement.addEventListener('touchend', onTouchEnd, false);
+            // Touch events for AR interaction
+            renderer.domElement.addEventListener('touchstart', onTouchStart);
+            renderer.domElement.addEventListener('touchmove', onTouchMove);
+            renderer.domElement.addEventListener('touchend', onTouchEnd);
+
+            window.addEventListener('resize', onWindowResize, false);
         }
 
         function onSelect() {
             if (reticle.visible && model) {
                 const modelClone = model.clone();
                 modelClone.position.setFromMatrixPosition(reticle.matrix);
-                modelClone.quaternion.setFromRotationMatrix(new THREE.Matrix4().lookAt(
-                    new THREE.Vector3(0, 0, 0),
-                    new THREE.Vector3(0, 1, 0),
-                    new THREE.Vector3(0, 0, 1)
-                ));
                 scene.add(modelClone);
                 placedModels.push(modelClone);
                 document.getElementById('instructions').style.display = 'block';
@@ -192,46 +221,47 @@
         }
 
         function onTouchStart(event) {
+            if (!isInAR) return;
+            
             if (event.touches.length === 1) {
-                // Single touch for moving
                 isMoving = true;
-                isRotating = false;
-                initialTouchPosition.x = event.touches[0].pageX;
-                initialTouchPosition.y = event.touches[0].pageY;
+                initialTouchPosition.set(
+                    event.touches[0].pageX,
+                    event.touches[0].pageY
+                );
                 findSelectedObject(event.touches[0].pageX, event.touches[0].pageY);
-            } else if (event.touches.length === 2) {
-                // Two touches for rotating
-                isMoving = false;
-                isRotating = true;
-                previousTouchPosition.x = event.touches[0].pageX - event.touches[1].pageX;
-                previousTouchPosition.y = event.touches[0].pageY - event.touches[1].pageY;
             }
         }
 
         function onTouchMove(event) {
-            if (isMoving && selectedObject) {
-                // Move object
-                const deltaX = (event.touches[0].pageX - initialTouchPosition.x) * 0.01;
-                const deltaZ = (event.touches[0].pageY - initialTouchPosition.y) * 0.01;
+            if (!isInAR || !selectedObject) return;
+
+            if (isMoving && event.touches.length === 1) {
+                const touch = event.touches[0];
+                const deltaX = (touch.pageX - initialTouchPosition.x) * 0.002;
+                const deltaZ = (touch.pageY - initialTouchPosition.y) * 0.002;
+
                 selectedObject.position.x += deltaX;
                 selectedObject.position.z += deltaZ;
-                initialTouchPosition.x = event.touches[0].pageX;
-                initialTouchPosition.y = event.touches[0].pageY;
-            } else if (isRotating && selectedObject) {
-                // Rotate object
-                const currentPosition = new THREE.Vector2(
-                    event.touches[0].pageX - event.touches[1].pageX,
-                    event.touches[0].pageY - event.touches[1].pageY
+
+                initialTouchPosition.set(touch.pageX, touch.pageY);
+            } else if (event.touches.length === 2) {
+                // Rotation logic
+                const touch1 = event.touches[0];
+                const touch2 = event.touches[1];
+                const rotation = Math.atan2(
+                    touch2.pageY - touch1.pageY,
+                    touch2.pageX - touch1.pageX
                 );
-                const angle = currentPosition.angle() - previousTouchPosition.angle();
-                selectedObject.rotation.y += angle;
-                previousTouchPosition.copy(currentPosition);
+                
+                if (selectedObject) {
+                    selectedObject.rotation.y = rotation;
+                }
             }
         }
 
         function onTouchEnd() {
             isMoving = false;
-            isRotating = false;
             selectedObject = null;
         }
 
@@ -246,7 +276,6 @@
             
             const intersects = raycaster.intersectObjects(placedModels, true);
             if (intersects.length > 0) {
-                // Find the top-level parent that was placed in the scene
                 let object = intersects[0].object;
                 while (object.parent && !placedModels.includes(object)) {
                     object = object.parent;
@@ -255,8 +284,14 @@
             }
         }
 
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
         function render(timestamp, frame) {
-            if (frame) {
+            if (frame && isInAR) {
                 if (!hitTestSourceRequested) {
                     frame.session.requestReferenceSpace('viewer').then((referenceSpace) => {
                         frame.session.requestHitTestSource({ space: referenceSpace })
