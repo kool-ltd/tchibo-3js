@@ -1,34 +1,81 @@
 <!DOCTYPE html>
-<!-- [Previous head section remains the same until style] -->
-<style>
-    /* [Previous styles remain the same] */
-    
-    #reset-button {
-        position: absolute;
-        bottom: 20px;
-        right: 20px;
-        padding: 12px 24px;
-        background: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        display: none;
-    }
+<html>
+<head>
+    <title>Tchibo - 4 in 1 rolling pin AR</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    #instructions {
-        position: absolute;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(0, 0, 0, 0.7);
-        color: white;
-        padding: 10px;
-        border-radius: 5px;
-        text-align: center;
-        display: none;
+        #scene-container {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #ar-button {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #reset-button {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            background: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: none;
+        }
+
+        #loading-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        #instructions {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            display: none;
+        }
+    </style>
+    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.159.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.159.0/examples/jsm/",
+            "three/examples/jsm/loaders/GLTFLoader.js": "https://unpkg.com/three@0.159.0/examples/jsm/loaders/GLTFLoader.js",
+            "three/examples/jsm/webxr/ARButton.js": "https://unpkg.com/three@0.159.0/examples/jsm/webxr/ARButton.js",
+            "three/examples/jsm/controls/OrbitControls.js": "https://unpkg.com/three@0.159.0/examples/jsm/controls/OrbitControls.js"
+        }
     }
-</style>
-<!-- [Previous head section remains the same until body] -->
+    </script>
+</head>
 <body>
     <div id="scene-container"></div>
     <button id="ar-button" style="display: none;">Enter AR</button>
@@ -39,15 +86,21 @@
     </div>
 
     <script type="module">
-        // [Previous imports remain the same]
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+        import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
+        import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-        let scene, camera, renderer, controller, controls;
+        // Initialize variables after THREE is imported
+        const scene = new THREE.Scene();
+        const initialTouchPosition = new THREE.Vector2();
+        
+        let camera, renderer, controller, controls;
         let models = { left: null, body: null, right: null };
         let reticle;
         let hitTestSource = null;
         let hitTestSourceRequested = false;
         let selectedObject = null;
-        let initialTouchPosition = new THREE.Vector2();
         let isMoving = false;
         let isInAR = false;
         let placedModels = [];
@@ -81,7 +134,6 @@
                     loadPart('./241218 - tchibo - 4 in 1 rolling pin-R.glb')
                 ]);
 
-                // Name the parts for identification
                 leftPart.name = 'left';
                 bodyPart.name = 'body';
                 rightPart.name = 'right';
@@ -135,7 +187,45 @@
         }
 
         async function init() {
-            // [Previous init code remains the same until AR setup]
+            camera = new THREE.PerspectiveCamera(
+                75,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+            camera.position.set(0, 0.3, 0.5);
+
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true, 
+                alpha: true,
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.xr.enabled = true;
+            document.getElementById('scene-container').appendChild(renderer.domElement);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 0.1, 0);
+            controls.update();
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            directionalLight.position.set(5, 5, 5);
+            scene.add(directionalLight);
+
+            const gridHelper = new THREE.GridHelper(2, 20);
+            scene.add(gridHelper);
+
+            reticle = new THREE.Mesh(
+                new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
+                new THREE.MeshBasicMaterial({ color: 0xffffff })
+            );
+            reticle.visible = false;
+            scene.add(reticle);
+
+            await loadModels();
 
             if ('xr' in navigator) {
                 navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
@@ -158,14 +248,21 @@
                 });
             }
 
-            // Reset button functionality
             document.getElementById('reset-button').addEventListener('click', () => {
                 placedModels.forEach(container => {
                     resetPartPositions(container);
                 });
             });
 
-            // [Rest of init code remains the same]
+            controller = renderer.xr.getController(0);
+            controller.addEventListener('select', onSelect);
+            scene.add(controller);
+
+            renderer.domElement.addEventListener('touchstart', onTouchStart);
+            renderer.domElement.addEventListener('touchmove', onTouchMove);
+            renderer.domElement.addEventListener('touchend', onTouchEnd);
+
+            window.addEventListener('resize', onWindowResize, false);
         }
 
         function onSelect() {
@@ -176,7 +273,6 @@
                 placedModels.push(containerClone);
                 document.getElementById('instructions').style.display = 'block';
 
-                // Store original positions for the cloned parts
                 containerClone.children.forEach(part => {
                     originalPositions.set(part.uuid, {
                         position: part.position.clone(),
@@ -195,7 +291,6 @@
             
             raycaster.setFromCamera(touch, camera);
             
-            // Check intersection with all parts of all placed models
             const allParts = [];
             placedModels.forEach(container => {
                 container.children.forEach(part => {
@@ -213,9 +308,80 @@
             }
         }
 
-        // [Previous touch event handlers remain the same]
+        function onTouchStart(event) {
+            if (!isInAR) return;
+            
+            if (event.touches.length === 1) {
+                isMoving = true;
+                initialTouchPosition.set(
+                    event.touches[0].pageX,
+                    event.touches[0].pageY
+                );
+                findSelectedObject(event.touches[0].pageX, event.touches[0].pageY);
+            }
+        }
 
-        // [Previous render function remains the same]
+        function onTouchMove(event) {
+            if (!isInAR || !selectedObject) return;
+
+            if (isMoving && event.touches.length === 1) {
+                const touch = event.touches[0];
+                const deltaX = (touch.pageX - initialTouchPosition.x) * 0.002;
+                const deltaZ = (touch.pageY - initialTouchPosition.y) * 0.002;
+
+                selectedObject.position.x += deltaX;
+                selectedObject.position.z += deltaZ;
+
+                initialTouchPosition.set(touch.pageX, touch.pageY);
+            } else if (event.touches.length === 2) {
+                const touch1 = event.touches[0];
+                const touch2 = event.touches[1];
+                const rotation = Math.atan2(
+                    touch2.pageY - touch1.pageY,
+                    touch2.pageX - touch1.pageX
+                );
+                
+                if (selectedObject) {
+                    selectedObject.rotation.y = rotation;
+                }
+            }
+        }
+
+        function onTouchEnd() {
+            isMoving = false;
+            selectedObject = null;
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function render(timestamp, frame) {
+            if (frame && isInAR) {
+                if (!hitTestSourceRequested) {
+                    frame.session.requestReferenceSpace('viewer').then((referenceSpace) => {
+                        frame.session.requestHitTestSource({ space: referenceSpace })
+                            .then((source) => hitTestSource = source);
+                    });
+                    hitTestSourceRequested = true;
+                }
+
+                if (hitTestSource) {
+                    const hitTestResults = frame.getHitTestResults(hitTestSource);
+                    if (hitTestResults.length > 0) {
+                        const hit = hitTestResults[0];
+                        reticle.visible = true;
+                        reticle.matrix.fromArray(hit.getPose(renderer.xr.getReferenceSpace()).transform.matrix);
+                    } else {
+                        reticle.visible = false;
+                    }
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
 
         init();
         renderer.setAnimationLoop(render);
