@@ -90,9 +90,10 @@
         import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
         import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
         import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-
+        import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js'; // Add this import
+        
         // Initialize variables after THREE is imported
-        const scene = new THREE.Scene();
+        let scene = new THREE.Scene(); // Changed from const to let
         const initialTouchPosition = new THREE.Vector2();
         
         let camera, renderer, controller, controls;
@@ -187,7 +188,19 @@
         }
 
         async function init() {
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true, 
+                alpha: true,
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.xr.enabled = true;
+            document.getElementById('scene-container').appendChild(renderer.domElement);
+        
             scene = new THREE.Scene();
+            
+            // Set animation loop before trying to load environment maps
+            renderer.setAnimationLoop(render);
             
             // Add RGBELoader for HDR environment maps
             const rgbeLoader = new THREE.RGBELoader();
@@ -210,6 +223,7 @@
                         reject
                     );
                 });
+                
             } catch (error) {
                 console.error('Error loading HDR environment map:', error);
             }
@@ -417,7 +431,6 @@
         }
 
         init();
-        renderer.setAnimationLoop(render);
     </script>
 </body>
 </html>
