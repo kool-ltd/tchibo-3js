@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js';
 
 export let scene, camera, renderer;
 
@@ -44,37 +45,64 @@ export async function initScene() {
 }
 
 function setupLighting() {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    // Subtle ambient light
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
     scene.add(ambientLight);
     
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    directionalLight.position.set(5, 5, 5);
-    scene.add(directionalLight);
+    // Main key light matching studio setup
+    const keyLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    keyLight.position.set(3, 4, 2);
+    scene.add(keyLight);
     
-    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
-    directionalLight2.position.set(-5, 5, -5);
-    scene.add(directionalLight2);
+    // Fill light
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.2);
+    fillLight.position.set(-2, 3, -2);
+    scene.add(fillLight);
     
-    const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.5);
-    scene.add(hemisphereLight);
+    // Ground bounce light
+    const bounceLight = new THREE.DirectionalLight(0xffffff, 0.1);
+    bounceLight.position.set(0, -3, 0);
+    scene.add(bounceLight);
 }
 
-async function setupEnvironment() {
-    const rgbeLoader = new RGBELoader();
+async function setupEnvironment(environmentIntensity = 0.8) {
+    const exrLoader = new EXRLoader();
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     pmremGenerator.compileEquirectangularShader();
 
     try {
         const texture = await new Promise((resolve, reject) => {
-            rgbeLoader.load(
-                'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/equirectangular/venice_sunset_1k.hdr',
+            exrLoader.load(
+                './assets/brown_photostudio_02_4k.exr',  // Update this path to where you stored the file
                 (texture) => {
                     const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+                    
+                    // Apply environment map and intensity
                     scene.environment = envMap;
-                    // Only set background in non-AR mode
+                    scene.envMapIntensity = environmentIntensity;
+                    
+                    // Update materials
+                    scene.traverse((object) => {
+                        if (object.material) {
+                            if (object.material.envMapIntensity !== undefined) {
+                                object.material.envMapIntensity = environmentIntensity;
+                            }
+                            // Optimize material properties for studio lighting
+                            if (object.material.roughness !== undefined) {
+                                object.material.roughness = Math.max(0.15, object.material.roughness);
+                            }
+                            if (object.material.metalness !== undefined) {
+                                object.material.metalness = Math.min(0.85, object.material.metalness);
+                            }
+                            object.material.needsUpdate = true;
+                        }
+                    });
+
+                    // Set neutral background for non-AR mode
                     if (!renderer.xr.isPresenting) {
-                        scene.background = new THREE.Color(0xf0f0f0);
+                        scene.background = new THREE.Color(0x2a2a2a); // Dark gray to match studio
                     }
+                    
                     texture.dispose();
                     pmremGenerator.dispose();
                     resolve(texture);
@@ -84,7 +112,7 @@ async function setupEnvironment() {
             );
         });
     } catch (error) {
-        console.error('Error loading HDR environment map:', error);
+        console.error('Error loading EXR environment map:', error);
     }
 }
 
