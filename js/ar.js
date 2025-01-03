@@ -31,15 +31,15 @@ function setupARButton() {
                     requiredFeatures: ['hit-test'],
                     optionalFeatures: ['dom-overlay'],
                     domOverlay: { root: document.body },
-                    // Add session start and end handlers
                     onSessionStart: () => {
                         isInAR = true;
-                        scene.background = null; // Remove background in AR mode
+                        scene.background = null;
+                        renderer.setClearColor(0x000000, 0);
                         document.getElementById('reset-button').style.display = 'block';
                     },
                     onSessionEnd: () => {
                         isInAR = false;
-                        scene.background = new THREE.Color(0xf0f0f0); // Restore background when exiting AR
+                        scene.background = new THREE.Color(0xf0f0f0);
                         document.getElementById('reset-button').style.display = 'none';
                     }
                 });
