@@ -16,11 +16,16 @@ export async function initScene() {
     );
     camera.position.set(0, 0.3, 0.5);
 
-    // Initialize renderer
+    // Initialize renderer with modified settings
     renderer = new THREE.WebGLRenderer({ 
         antialias: true, 
         alpha: true,
+        premultipliedAlpha: false,
+        stencil: false,
+        depth: true,
+        logarithmicDepthBuffer: true
     });
+    renderer.setClearColor(0x000000, 0); // Set clear color with 0 alpha
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.xr.enabled = true;
@@ -29,8 +34,10 @@ export async function initScene() {
     // Setup lighting
     setupLighting();
 
-    // Setup environment
-    await setupEnvironment();
+    // Setup environment only for non-AR mode
+    if (!renderer.xr.isPresenting) {
+        await setupEnvironment();
+    }
 
     // Set animation loop
     renderer.setAnimationLoop(render);
@@ -63,8 +70,11 @@ async function setupEnvironment() {
                 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/equirectangular/venice_sunset_1k.hdr',
                 (texture) => {
                     const envMap = pmremGenerator.fromEquirectangular(texture).texture;
-                    scene.environment = envMap; // Keep environment lighting
-                    scene.background = new THREE.Color(0xf0f0f0); // Set initial background for non-AR mode
+                    scene.environment = envMap;
+                    // Only set background in non-AR mode
+                    if (!renderer.xr.isPresenting) {
+                        scene.background = new THREE.Color(0xf0f0f0);
+                    }
                     texture.dispose();
                     pmremGenerator.dispose();
                     resolve(texture);
@@ -80,6 +90,12 @@ async function setupEnvironment() {
 
 function render(timestamp, frame) {
     if (!scene || !camera || !renderer) return;
+
+    // Clear background in AR mode
+    if (renderer.xr.isPresenting) {
+        scene.background = null;
+        renderer.setClearColor(0x000000, 0);
+    }
 
     try {
         renderer.render(scene, camera);
