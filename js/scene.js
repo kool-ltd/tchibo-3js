@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
-import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js';
+import { EXRLoader } from './three/addons/loaders/EXRLoader.js';
 
 export let scene, camera, renderer;
 
