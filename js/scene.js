@@ -66,53 +66,53 @@ function setupLighting() {
 }
 
 async function setupEnvironment(environmentIntensity = 0.8) {
-    const exrLoader = new EXRLoader();
+    const rgbeLoader = new RGBELoader();
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     pmremGenerator.compileEquirectangularShader();
 
     try {
         const texture = await new Promise((resolve, reject) => {
-            exrLoader.load(
-                './assets/brown_photostudio_02_4k.exr',  // Update this path to where you stored the file
-                (texture) => {
-                    const envMap = pmremGenerator.fromEquirectangular(texture).texture;
-                    
-                    // Apply environment map and intensity
-                    scene.environment = envMap;
-                    scene.envMapIntensity = environmentIntensity;
-                    
-                    // Update materials
-                    scene.traverse((object) => {
-                        if (object.material) {
-                            if (object.material.envMapIntensity !== undefined) {
-                                object.material.envMapIntensity = environmentIntensity;
+            rgbeLoader.setDataType(THREE.HalfFloatType)
+                .load(
+                    'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/brown_photostudio_02_2k.hdr',  // Using HDR instead of EXR
+                    (texture) => {
+                        const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+                        
+                        // Apply environment map and intensity
+                        scene.environment = envMap;
+                        scene.envMapIntensity = environmentIntensity;
+                        
+                        // Update materials
+                        scene.traverse((object) => {
+                            if (object.material) {
+                                if (object.material.envMapIntensity !== undefined) {
+                                    object.material.envMapIntensity = environmentIntensity;
+                                }
+                                if (object.material.roughness !== undefined) {
+                                    object.material.roughness = Math.max(0.15, object.material.roughness);
+                                }
+                                if (object.material.metalness !== undefined) {
+                                    object.material.metalness = Math.min(0.85, object.material.metalness);
+                                }
+                                object.material.needsUpdate = true;
                             }
-                            // Optimize material properties for studio lighting
-                            if (object.material.roughness !== undefined) {
-                                object.material.roughness = Math.max(0.15, object.material.roughness);
-                            }
-                            if (object.material.metalness !== undefined) {
-                                object.material.metalness = Math.min(0.85, object.material.metalness);
-                            }
-                            object.material.needsUpdate = true;
-                        }
-                    });
+                        });
 
-                    // Set neutral background for non-AR mode
-                    if (!renderer.xr.isPresenting) {
-                        scene.background = new THREE.Color(0x2a2a2a); // Dark gray to match studio
-                    }
-                    
-                    texture.dispose();
-                    pmremGenerator.dispose();
-                    resolve(texture);
-                },
-                undefined,
-                reject
-            );
+                        // Set neutral background
+                        if (!renderer.xr.isPresenting) {
+                            scene.background = new THREE.Color(0x2a2a2a);
+                        }
+                        
+                        texture.dispose();
+                        pmremGenerator.dispose();
+                        resolve(texture);
+                    },
+                    undefined,
+                    reject
+                );
         });
     } catch (error) {
-        console.error('Error loading EXR environment map:', error);
+        console.error('Error loading environment map:', error);
     }
 }
 
