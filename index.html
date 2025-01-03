@@ -207,16 +207,23 @@
             controls = new OrbitControls(camera, renderer.domElement);
             controls.target.set(0, 0.1, 0);
             controls.update();
-
-            const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
             scene.add(ambientLight);
-
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
             directionalLight.position.set(5, 5, 5);
             scene.add(directionalLight);
+            
+            // Add additional lights for better material visibility
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLight2.position.set(-5, 5, -5);
+            scene.add(directionalLight2);
+            
+            const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 1);
+            scene.add(hemisphereLight);
 
-            const gridHelper = new THREE.GridHelper(2, 20);
-            scene.add(gridHelper);
 
             reticle = new THREE.Mesh(
                 new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
