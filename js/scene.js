@@ -63,8 +63,8 @@ async function setupEnvironment() {
                 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/equirectangular/venice_sunset_1k.hdr',
                 (texture) => {
                     const envMap = pmremGenerator.fromEquirectangular(texture).texture;
-                    scene.environment = envMap;
-                    scene.background = new THREE.Color(0xf0f0f0);
+                    scene.environment = envMap; // Keep environment lighting
+                    scene.background = new THREE.Color(0xf0f0f0); // Set initial background for non-AR mode
                     texture.dispose();
                     pmremGenerator.dispose();
                     resolve(texture);
