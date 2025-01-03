@@ -30,11 +30,20 @@ function setupARButton() {
                 const arButton = ARButton.createButton(renderer, {
                     requiredFeatures: ['hit-test'],
                     optionalFeatures: ['dom-overlay'],
-                    domOverlay: { root: document.body }
+                    domOverlay: { root: document.body },
+                    // Add session start and end handlers
+                    onSessionStart: () => {
+                        isInAR = true;
+                        scene.background = null; // Remove background in AR mode
+                        document.getElementById('reset-button').style.display = 'block';
+                    },
+                    onSessionEnd: () => {
+                        isInAR = false;
+                        scene.background = new THREE.Color(0xf0f0f0); // Restore background when exiting AR
+                        document.getElementById('reset-button').style.display = 'none';
+                    }
                 });
                 document.body.appendChild(arButton);
-
-                arButton.addEventListener('click', onARButtonClick);
             }
         });
     }
