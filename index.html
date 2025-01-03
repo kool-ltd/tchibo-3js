@@ -187,6 +187,33 @@
         }
 
         async function init() {
+            scene = new THREE.Scene();
+            
+            // Add RGBELoader for HDR environment maps
+            const rgbeLoader = new THREE.RGBELoader();
+            const pmremGenerator = new THREE.PMREMGenerator(renderer);
+            pmremGenerator.compileEquirectangularShader();
+        
+            try {
+                const texture = await new Promise((resolve, reject) => {
+                    rgbeLoader.load(
+                        'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/equirectangular/venice_sunset_1k.hdr',
+                        (texture) => {
+                            const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+                            scene.environment = envMap;
+                            scene.background = new THREE.Color(0xf0f0f0); // Or keep envMap for background
+                            texture.dispose();
+                            pmremGenerator.dispose();
+                            resolve(texture);
+                        },
+                        undefined,
+                        reject
+                    );
+                });
+            } catch (error) {
+                console.error('Error loading HDR environment map:', error);
+            }
+
             camera = new THREE.PerspectiveCamera(
                 75,
                 window.innerWidth / window.innerHeight,
@@ -209,19 +236,18 @@
             controls.update();
             
             // Lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
             
             const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
             directionalLight.position.set(5, 5, 5);
             scene.add(directionalLight);
             
-            // Add additional lights for better material visibility
             const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
             directionalLight2.position.set(-5, 5, -5);
             scene.add(directionalLight2);
             
-            const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 1);
+            const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.5);
             scene.add(hemisphereLight);
 
 
