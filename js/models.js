@@ -2,14 +2,15 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { scene } from './scene.js';
 
+// Constants
+const REAL_WORLD_LENGTH = 0.045;
+
 export let models = { left: null, body: null, right: null };
 export let modelContainer;
 export let originalPositions = new Map();
 
 export async function loadModels() {
     const loader = new GLTFLoader();
-    const REAL_WORLD_LENGTH = 0.045;
-    
     modelContainer = new THREE.Group();
     
     const loadPart = (url) => {
