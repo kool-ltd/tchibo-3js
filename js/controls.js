@@ -7,6 +7,7 @@ export let controls;
 let selectedObject = null;
 let isMoving = false;
 const initialTouchPosition = new THREE.Vector2();
+const raycaster = new THREE.Raycaster();
 
 export function initControls() {
     controls = new OrbitControls(camera, renderer.domElement);
@@ -15,9 +16,9 @@ export function initControls() {
 }
 
 export function setupEventListeners() {
-    renderer.domElement.addEventListener('touchstart', onTouchStart);
-    renderer.domElement.addEventListener('touchmove', onTouchMove);
-    renderer.domElement.addEventListener('touchend', onTouchEnd);
+    renderer.domElement.addEventListener('touchstart', onTouchStart, false);
+    renderer.domElement.addEventListener('touchmove', onTouchMove, false);
+    renderer.domElement.addEventListener('touchend', onTouchEnd, false);
 
     document.getElementById('reset-button').addEventListener('click', () => {
         placedModels.forEach(container => {
@@ -27,26 +28,28 @@ export function setupEventListeners() {
 }
 
 function findSelectedObject(x, y) {
-    const raycaster = new THREE.Raycaster();
     const touch = new THREE.Vector2();
     
+    // Normalize touch coordinates
     touch.x = (x / window.innerWidth) * 2 - 1;
     touch.y = -(y / window.innerHeight) * 2 + 1;
     
     raycaster.setFromCamera(touch, camera);
     
+    // Collect all interactive objects
     const allParts = [];
-    scene.children.forEach(child => {
-        if (child.type === 'Group') {
-            child.children.forEach(part => {
-                allParts.push(part);
-            });
+    scene.traverse((object) => {
+        // Check for mesh objects that should be interactive
+        if (object.isMesh || object.type === 'Group') {
+            allParts.push(object);
         }
     });
     
     const intersects = raycaster.intersectObjects(allParts, true);
+    
     if (intersects.length > 0) {
         let object = intersects[0].object;
+        // Find the parent object that should be moved
         while (object.parent && !allParts.includes(object)) {
             object = object.parent;
         }
@@ -56,43 +59,59 @@ function findSelectedObject(x, y) {
 }
 
 function onTouchStart(event) {
+    event.preventDefault(); // Prevent default touch behavior
+
     if (event.touches.length === 1) {
         isMoving = true;
-        initialTouchPosition.set(
-            event.touches[0].pageX,
-            event.touches[0].pageY
-        );
-        selectedObject = findSelectedObject(event.touches[0].pageX, event.touches[0].pageY);
+        const touch = event.touches[0];
+        
+        // Get touch position relative to the renderer's canvas
+        const rect = renderer.domElement.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        
+        initialTouchPosition.set(touch.clientX, touch.clientY);
+        selectedObject = findSelectedObject(x, y);
     }
 }
 
 function onTouchMove(event) {
+    event.preventDefault();
+
     if (!selectedObject) return;
 
     if (isMoving && event.touches.length === 1) {
         const touch = event.touches[0];
-        const deltaX = (touch.pageX - initialTouchPosition.x) * 0.002;
-        const deltaZ = (touch.pageY - initialTouchPosition.y) * 0.002;
+        
+        // Calculate movement in screen space
+        const deltaX = (touch.clientX - initialTouchPosition.x) * 0.002;
+        const deltaZ = (touch.clientY - initialTouchPosition.y) * 0.002;
 
-        selectedObject.position.x += deltaX;
-        selectedObject.position.z += deltaZ;
-
-        initialTouchPosition.set(touch.pageX, touch.pageY);
+        // Convert screen movement to world space movement
+        const movementVector = new THREE.Vector3(deltaX, 0, deltaZ);
+        movementVector.applyQuaternion(camera.quaternion);
+        
+        // Apply movement
+        selectedObject.position.add(movementVector);
+        
+        initialTouchPosition.set(touch.clientX, touch.clientY);
     } else if (event.touches.length === 2) {
         const touch1 = event.touches[0];
         const touch2 = event.touches[1];
-        const rotation = Math.atan2(
-            touch2.pageY - touch1.pageY,
-            touch2.pageX - touch1.pageX
+        
+        // Calculate rotation based on the line between two touch points
+        const angle = Math.atan2(
+            touch2.clientY - touch1.clientY,
+            touch2.clientX - touch1.clientX
         );
         
-        if (selectedObject) {
-            selectedObject.rotation.y = rotation;
-        }
+        // Apply rotation relative to world up vector
+        selectedObject.rotation.y = angle;
     }
 }
 
-function onTouchEnd() {
+function onTouchEnd(event) {
+    event.preventDefault();
     isMoving = false;
     selectedObject = null;
 }
