@@ -2,11 +2,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { camera, renderer, scene } from './scene.js';
 import { resetPartPositions } from './models.js';
+import { isInAR, placedModels } from './ar.js';
 
 export let controls;
 let selectedObject = null;
 let isMoving = false;
 const initialTouchPosition = new THREE.Vector2();
+const initialPinchDistance = new THREE.Vector2();
 
 export function initControls() {
     controls = new OrbitControls(camera, renderer.domElement);
@@ -35,28 +37,26 @@ function findSelectedObject(x, y) {
     
     raycaster.setFromCamera(touch, camera);
     
-    const allParts = [];
-    scene.children.forEach(child => {
-        if (child.type === 'Group') {
-            child.children.forEach(part => {
-                allParts.push(part);
-            });
-        }
+    const placedModelParts = [];
+    placedModels.forEach(container => {
+        container.children.forEach(part => {
+            placedModelParts.push(part);
+        });
     });
     
-    const intersects = raycaster.intersectObjects(allParts, true);
+    const intersects = raycaster.intersectObjects(placedModelParts, true);
     if (intersects.length > 0) {
         let object = intersects[0].object;
-        while (object.parent && !allParts.includes(object)) {
+        while (object.parent && !placedModelParts.includes(object)) {
             object = object.parent;
         }
-        return object;
+        return object.parent; // Return the entire container
     }
     return null;
 }
 
 function onTouchStart(event) {
-    if (event.touches.length === 1) {
+    if (isInAR && event.touches.length === 1) {
         isMoving = true;
         initialTouchPosition.set(
             event.touches[0].pageX,
@@ -67,12 +67,12 @@ function onTouchStart(event) {
 }
 
 function onTouchMove(event) {
-    if (!selectedObject) return;
+    if (!isInAR || !selectedObject) return;
 
-    if (isMoving && event.touches.length === 1) {
+    if (event.touches.length === 1) {
         const touch = event.touches[0];
-        const deltaX = (touch.pageX - initialTouchPosition.x) * 0.002;
-        const deltaZ = (touch.pageY - initialTouchPosition.y) * 0.002;
+        const deltaX = (touch.pageX - initialTouchPosition.x) * 0.005;
+        const deltaZ = (touch.pageY - initialTouchPosition.y) * 0.005;
 
         selectedObject.position.x += deltaX;
         selectedObject.position.z += deltaZ;
@@ -81,9 +81,17 @@ function onTouchMove(event) {
     } else if (event.touches.length === 2) {
         const touch1 = event.touches[0];
         const touch2 = event.touches[1];
+
+        // Rotation
         const rotation = Math.atan2(
             touch2.pageY - touch1.pageY,
             touch2.pageX - touch1.pageX
+        );
+        
+        // Scaling
+        const currentPinchDistance = Math.hypot(
+            touch2.pageX - touch1.pageX, 
+            touch2.pageY - touch1.pageY
         );
         
         if (selectedObject) {
