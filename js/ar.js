@@ -84,6 +84,10 @@ export function onSelect() {
     if (reticle.visible && modelContainer) {
         const containerClone = modelContainer.clone();
         containerClone.position.setFromMatrixPosition(reticle.matrix);
+        
+        // Enable manipulation for the placed model
+        containerClone.userData.isPlacedModel = true;
+        
         scene.add(containerClone);
         placedModels.push(containerClone);
         document.getElementById('instructions').style.display = 'block';
